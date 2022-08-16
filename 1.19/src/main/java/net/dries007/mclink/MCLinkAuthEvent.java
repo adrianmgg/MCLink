@@ -7,7 +7,7 @@ package net.dries007.mclink;
 import com.google.common.collect.ImmutableCollection;
 import net.dries007.mclink.api.Authentication;
 import net.dries007.mclink.common.MCLinkCommon;
-import net.minecraftforge.fml.common.eventhandler.Event;
+import net.minecraftforge.eventbus.api.Event;
 
 import java.util.UUID;
 
