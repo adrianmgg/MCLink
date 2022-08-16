@@ -2,6 +2,12 @@ import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
+plugins {
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1.+' apply false
+}
+
+
 version = "0.3.2"
 if (System.getenv().BUILD_NUMBER != null) version += "." + System.getenv().BUILD_NUMBER
 
@@ -21,18 +27,27 @@ ext.getChangeLog = { ->
 
 evaluationDependsOnChildren()
 
+
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+
 allprojects {
     group = "net.dries007.mclink"
     archivesBaseName = "MCLink"
-    apply plugin: 'maven'
-    sourceCompatibility = targetCompatibility = "1.8"
-    compileJava {
-        sourceCompatibility = targetCompatibility = "1.8"
-    }
+    apply plugin: 'maven-publish'
+//    sourceCompatibility = targetCompatibility = "1.8"
+//    compileJava {
+//        sourceCompatibility = targetCompatibility = "1.8"
+//    }
 }
 
 repositories {
@@ -40,10 +55,10 @@ repositories {
 }
 
 dependencies {
-    compile 'com.google.guava:guava:17.0'
-    compile 'com.google.code.gson:gson:2.2.4'
-    compile 'org.apache.logging.log4j:log4j-core:2.0-beta9'
-    compile 'org.jetbrains:annotations:15.0'
+    implementation 'com.google.guava:guava:17.0'
+    implementation 'com.google.code.gson:gson:2.2.4'
+    implementation 'org.apache.logging.log4j:log4j-core:2.0-beta9'
+    implementation 'org.jetbrains:annotations:15.0'
 }
 
 //noinspection GroovyAssignabilityCheck
@@ -63,7 +78,7 @@ subprojects {
     version = rootProject.version
 
     dependencies {
-        compile rootProject
+        implementation rootProject
     }
 
     sourceSets.main.resources.srcDirs += rootProject.sourceSets.main.resources.srcDirs
@@ -75,51 +90,56 @@ subprojects {
     }
 
     if (project.hasProperty('minecraft')) {
-        sourceJar {
-            //noinspection GroovyAssignabilityCheck
-            duplicatesStrategy = 'exclude'
-            from rootProject.sourceSets.main.allSource
-        }
+//        sourceJar {
+//            //noinspection GroovyAssignabilityCheck
+//            duplicatesStrategy = 'exclude'
+//            from rootProject.sourceSets.main.allSource
+//        }
+//        task sourcesJar(type: Jar) {
+//            duplicatesStrategy = DuplicatesStrategy.INCLUDE
+//            from rootProject.sourceSets.main.allSource
+//        }
 
         //noinspection GroovyAssignabilityCheck
         project.tasks.withType(Jar) { jarTask ->
-            jarTask.appendix = 'Forge-' + project.minecraft.version
+            jarTask.duplicatesStrategy = 'exclude'
+            jarTask.appendix = 'Forge-' + project.minecraft.mappingVersion // TODO is mappingVersion the right thing to use?
         }
 
-        processResources {
-            inputs.property "version", project.version
-            inputs.property "mcversion", project.minecraft.version
-
-            from(sourceSets.main.resources.srcDirs) {
-                include 'mcmod.info'
-                expand 'version': project.version, 'mcversion': project.minecraft.version
-            }
-
-            from(sourceSets.main.resources.srcDirs) {
-                exclude 'mcmod.info'
-            }
-
-            doLast {
-                //noinspection GroovyAssignabilityCheck
-                def updateFile = new File(project.archivesBaseName.toLowerCase() + '.json')
-                def json
-                if (updateFile.exists()) {
-                    json = new JsonSlurper().parseText(updateFile.getText())
-                } else {
-                    def builder = new JsonBuilder()
-                    json = builder(homepage: "https://mclink.dries007.net", promos: new HashMap<>())
-                }
-                //noinspection GroovyAssignabilityCheck
-                json['promos'][project.minecraft.version + '-latest'] = project.version
-                //noinspection GroovyAssignabilityCheck
-                json['promos'][project.minecraft.version + '-recommended'] = project.version
-                if (!json.containsKey(project.minecraft.version)) json.put(project.minecraft.version, new HashMap<>())
-                //noinspection GroovyAssignabilityCheck
-                def version = json[project.minecraft.version]
-                version.put(project.version, getChangeLog())
-                updateFile.write JsonOutput.prettyPrint(JsonOutput.toJson(json))
-            }
-        }
+//        processResources {
+//            inputs.property "version", project.version
+//            inputs.property "mcversion", project.minecraft.mappingVersion
+//
+////            from(sourceSets.main.resources.srcDirs) {
+////                include 'mods.toml'
+////                expand 'version': project.version, 'mcversion': project.minecraft.mappingVersion
+////            }
+//
+//            from(sourceSets.main.resources.srcDirs) {
+//                exclude 'mods.toml'
+//            }
+//
+//            doLast {
+//                //noinspection GroovyAssignabilityCheck
+//                def updateFile = new File(project.archivesBaseName.toLowerCase() + '.json')
+//                def json
+//                if (updateFile.exists()) {
+//                    json = new JsonSlurper().parseText(updateFile.getText())
+//                } else {
+//                    def builder = new JsonBuilder()
+//                    json = builder(homepage: "https://mclink.dries007.net", promos: new HashMap<>())
+//                }
+//                //noinspection GroovyAssignabilityCheck
+//                json['promos'][project.minecraft.version + '-latest'] = project.version
+//                //noinspection GroovyAssignabilityCheck
+//                json['promos'][project.minecraft.version + '-recommended'] = project.version
+//                if (!json.containsKey(project.minecraft.version)) json.put(project.minecraft.version, new HashMap<>())
+//                //noinspection GroovyAssignabilityCheck
+//                def version = json[project.minecraft.version]
+//                version.put(project.version, getChangeLog())
+//                updateFile.write JsonOutput.prettyPrint(JsonOutput.toJson(json))
+//            }
+//        }
 
         rootProject.setupDecompWorkspace.dependsOn setupDecompWorkspace
         rootProject.setupDevWorkspace.dependsOn setupDevWorkspace
