@@ -4,32 +4,43 @@
 
 package net.dries007.mclink;
 
+import com.electronwill.nightconfig.core.CommentedConfig;
+import com.electronwill.nightconfig.core.Config;
+import com.electronwill.nightconfig.core.UnmodifiableConfig;
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.mojang.logging.LogUtils;
 import net.dries007.mclink.api.APIException;
 import net.dries007.mclink.common.CommonConfig;
-import net.minecraftforge.common.config.Configuration;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
-import static net.minecraftforge.common.config.Configuration.CATEGORY_GENERAL;
-
+// TODO probably rename this to avoid confusion with `ForgeConfigSpec`
+// TODO integrate this more into the new forge config system?
 /**
  * @author Dries007
  */
 @SuppressWarnings("Duplicates")
 public class ForgeConfig extends CommonConfig
 {
-    private static final String CAT = "Services";
-    private final Configuration cfg;
+    private static final String CATEGORY_SERVICES = "Services";
+//    private final FileConfig cfg;
+    private final CommentedFileConfig cfg;
+
+    private static final String CATEGORY_GENERAL = "general";
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     ForgeConfig(File file)
     {
-        this.cfg = new Configuration(file, true);
+        this.cfg = CommentedFileConfig.of(file);
     }
 
     @Nullable
@@ -45,58 +56,104 @@ public class ForgeConfig extends CommonConfig
     @Override
     public boolean setClosed(boolean close)
     {
-        cfg.get(CATEGORY_GENERAL, "closed", false).set(close);
+        cfg.set(List.of(CATEGORY_GENERAL, "closed"), close);
         cfg.save();
         return super.setClosed(close);
+    }
+
+    private CommentedConfig _getOrCreateCategory(String categoryName)
+    {
+        // TODO handle case where category present but wrong type
+        CommentedConfig category = cfg.<CommentedConfig>get(List.of(categoryName));
+        if(category != null) return category;
+        else {
+            CommentedConfig newCategory = CommentedConfig.inMemory();
+            cfg.set(List.of(categoryName), newCategory);
+            return newCategory;
+        }
+    }
+
+    private <T> void _setDefaultComment(String comment, String category, String key)
+    {
+        List<String> path = List.of(category, key);
+        @Nullable String curComment = cfg.getComment(path);
+        if(curComment == null) {
+            cfg.setComment(path, comment);
+            // TODO check that setting the comment set actually stuck
+        }
+    }
+
+    private <T> T _getOrDefaultAndPopulate(T defaultVal, String category, String key)
+    {
+        _getOrCreateCategory(category);
+        List<String> pathList = List.of(category, key);
+        // TODO handle case where key present on category but wrong value type
+        T curVal = cfg.<T>get(pathList);
+        if(curVal != null) return curVal;
+        else {
+            cfg.<T>set(pathList, defaultVal);
+            return defaultVal;
+        }
+    }
+
+    // TODO rename this
+    @NotNull
+    private <T> T _get(@NotNull T defaultVal, @NotNull String comment, @NotNull String category, @NotNull String key)
+    {
+        T ret = _getOrDefaultAndPopulate(defaultVal, category, key);
+        _setDefaultComment(comment, category, key);
+        return ret;
     }
 
     @Override
     protected String getString(String key, String def, String comment)
     {
-        return cfg.getString(key, CATEGORY_GENERAL, def, comment);
+        return _get(def, comment, CATEGORY_GENERAL, key);
     }
 
     @Override
     protected boolean getBoolean(String key, boolean def, String comment)
     {
-        return cfg.getBoolean(key, CATEGORY_GENERAL, def, comment);
+        return _get(def, comment, CATEGORY_GENERAL, key);
     }
 
     @Override
     protected int getInt(String key, int def, int min, int max, String comment)
     {
-        return cfg.getInt(key, CATEGORY_GENERAL, def, min, max, comment);
+        // TODO range not used
+        return _get(def, comment, CATEGORY_GENERAL, key);
     }
 
     @Override
     protected void addService(String name, String comment)
     {
-        cfg.get(CAT, name, new String[0], comment);
+        _get(new String[0], comment, CATEGORY_SERVICES, name);
     }
 
     @Override
     protected Set<String> getAllDefinedServices()
     {
-        return cfg.getCategory(CAT).keySet();
+        return _getOrCreateCategory(CATEGORY_SERVICES).entrySet().stream()
+            .map(UnmodifiableConfig.Entry::getKey)
+            .collect(Collectors.toSet());
     }
 
     @Override
     protected void setGlobalCommentServices(String comment)
     {
-        cfg.setCategoryComment(CAT, comment);
+        cfg.setComment(List.of(CATEGORY_SERVICES), comment);
     }
 
     @Override
     protected List<String>[] getServiceEntries(String name)
     {
-        return Arrays.stream(cfg.get(CAT, name, new String[0]).getStringList())
-                .map(CommonConfig::splitArgumentString)
-                .toArray((IntFunction<List<String>[]>) List[]::new);
+        // TODO ough
+        return (List<String>[])(new List[]{_getOrDefaultAndPopulate(List.<String>of(), CATEGORY_SERVICES, name)});
     }
 
     @Override
     protected void setServiceComment(String name, String comment)
     {
-        cfg.getCategory(name).setComment(comment);
+        _setDefaultComment(comment, CATEGORY_SERVICES, name);
     }
 }
