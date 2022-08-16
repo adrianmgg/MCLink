@@ -90,6 +90,8 @@ subprojects {
     }
 
     if (project.hasProperty('minecraft')) {
+        // TODO actually get this from the project. old code used project.minecraft.version but that doesn't seem to work anymore
+        def project_mc_version = "1.19"
 //        sourceJar {
 //            //noinspection GroovyAssignabilityCheck
 //            duplicatesStrategy = 'exclude'
@@ -103,43 +105,43 @@ subprojects {
         //noinspection GroovyAssignabilityCheck
         project.tasks.withType(Jar) { jarTask ->
             jarTask.duplicatesStrategy = 'exclude'
-            jarTask.appendix = 'Forge-' + project.minecraft.mappingVersion // TODO is mappingVersion the right thing to use?
+            jarTask.appendix = 'Forge-' + project_mc_version
         }
 
-//        processResources {
-//            inputs.property "version", project.version
-//            inputs.property "mcversion", project.minecraft.mappingVersion
-//
-////            from(sourceSets.main.resources.srcDirs) {
-////                include 'mods.toml'
-////                expand 'version': project.version, 'mcversion': project.minecraft.mappingVersion
-////            }
-//
+        processResources {
+            inputs.property "version", project.version
+            inputs.property "mcversion", project_mc_version
+
+//            from(sourceSets.main.resources.srcDirs) {
+//                include 'mods.toml'
+//                expand 'version': project.version, 'mcversion': project.minecraft.mappingVersion
+//            }
+
 //            from(sourceSets.main.resources.srcDirs) {
 //                exclude 'mods.toml'
 //            }
-//
-//            doLast {
-//                //noinspection GroovyAssignabilityCheck
-//                def updateFile = new File(project.archivesBaseName.toLowerCase() + '.json')
-//                def json
-//                if (updateFile.exists()) {
-//                    json = new JsonSlurper().parseText(updateFile.getText())
-//                } else {
-//                    def builder = new JsonBuilder()
-//                    json = builder(homepage: "https://mclink.dries007.net", promos: new HashMap<>())
-//                }
-//                //noinspection GroovyAssignabilityCheck
-//                json['promos'][project.minecraft.version + '-latest'] = project.version
-//                //noinspection GroovyAssignabilityCheck
-//                json['promos'][project.minecraft.version + '-recommended'] = project.version
-//                if (!json.containsKey(project.minecraft.version)) json.put(project.minecraft.version, new HashMap<>())
-//                //noinspection GroovyAssignabilityCheck
-//                def version = json[project.minecraft.version]
-//                version.put(project.version, getChangeLog())
-//                updateFile.write JsonOutput.prettyPrint(JsonOutput.toJson(json))
-//            }
-//        }
+
+            doLast {
+                //noinspection GroovyAssignabilityCheck
+                def updateFile = new File(project.archivesBaseName.toLowerCase() + '.json')
+                def json
+                if (updateFile.exists()) {
+                    json = new JsonSlurper().parseText(updateFile.getText())
+                } else {
+                    def builder = new JsonBuilder()
+                    json = builder(homepage: "https://mclink.dries007.net", promos: new HashMap<>())
+                }
+                //noinspection GroovyAssignabilityCheck
+                json['promos'][project_mc_version + '-latest'] = project.version
+                //noinspection GroovyAssignabilityCheck
+                json['promos'][project_mc_version + '-recommended'] = project.version
+                if (!json.containsKey(project_mc_version)) json.put(project_mc_version, new HashMap<>())
+                //noinspection GroovyAssignabilityCheck
+                def version = json[project_mc_version]
+                version.put(project.version, getChangeLog())
+                updateFile.write JsonOutput.prettyPrint(JsonOutput.toJson(json))
+            }
+        }
 
         rootProject.setupDecompWorkspace.dependsOn setupDecompWorkspace
         rootProject.setupDevWorkspace.dependsOn setupDevWorkspace
