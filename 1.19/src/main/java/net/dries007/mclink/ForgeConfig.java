@@ -127,7 +127,7 @@ public class ForgeConfig extends CommonConfig
     @Override
     protected void addService(String name, String comment)
     {
-        _get(new String[0], comment, CATEGORY_SERVICES, name);
+        _get(List.<List<String>>of(), comment, CATEGORY_SERVICES, name);
     }
 
     @Override
@@ -147,8 +147,8 @@ public class ForgeConfig extends CommonConfig
     @Override
     protected List<String>[] getServiceEntries(String name)
     {
-        // TODO ough
-        return (List<String>[])(new List[]{_getOrDefaultAndPopulate(List.<String>of(), CATEGORY_SERVICES, name)});
+        return _getOrDefaultAndPopulate(List.<List<String>>of(), CATEGORY_SERVICES, name)
+            .toArray((IntFunction<List<String>[]>) List[]::new);
     }
 
     @Override
