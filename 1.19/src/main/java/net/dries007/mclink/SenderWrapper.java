@@ -6,10 +6,10 @@ package net.dries007.mclink;
 
 import net.dries007.mclink.binding.FormatCode;
 import net.dries007.mclink.binding.ISender;
-import net.minecraft.command.ICommandSender;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextFormatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.ChatSender;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -18,61 +18,61 @@ import org.jetbrains.annotations.NotNull;
 @SuppressWarnings("Duplicates")
 public class SenderWrapper implements ISender
 {
-    private final ICommandSender sender;
+    private final CommandSourceStack sender;
 
-    SenderWrapper(ICommandSender sender)
+    SenderWrapper(CommandSourceStack sender)
     {
         this.sender = sender;
     }
 
-    private static TextFormatting getFormatCode(FormatCode formatCode)
+    private static ChatFormatting getFormatCode(FormatCode formatCode)
     {
         switch (formatCode)
         {
             case BLACK:
-                return TextFormatting.BLACK;
+                return ChatFormatting.BLACK;
             case DARK_BLUE:
-                return TextFormatting.DARK_BLUE;
+                return ChatFormatting.DARK_BLUE;
             case DARK_GREEN:
-                return TextFormatting.DARK_GREEN;
+                return ChatFormatting.DARK_GREEN;
             case DARK_AQUA:
-                return TextFormatting.DARK_AQUA;
+                return ChatFormatting.DARK_AQUA;
             case DARK_RED:
-                return TextFormatting.DARK_RED;
+                return ChatFormatting.DARK_RED;
             case DARK_PURPLE:
-                return TextFormatting.DARK_PURPLE;
+                return ChatFormatting.DARK_PURPLE;
             case GOLD:
-                return TextFormatting.GOLD;
+                return ChatFormatting.GOLD;
             case GRAY:
-                return TextFormatting.GRAY;
+                return ChatFormatting.GRAY;
             case DARK_GRAY:
-                return TextFormatting.DARK_GRAY;
+                return ChatFormatting.DARK_GRAY;
             case BLUE:
-                return TextFormatting.BLUE;
+                return ChatFormatting.BLUE;
             case GREEN:
-                return TextFormatting.GREEN;
+                return ChatFormatting.GREEN;
             case AQUA:
-                return TextFormatting.AQUA;
+                return ChatFormatting.AQUA;
             case RED:
-                return TextFormatting.RED;
+                return ChatFormatting.RED;
             case LIGHT_PURPLE:
-                return TextFormatting.LIGHT_PURPLE;
+                return ChatFormatting.LIGHT_PURPLE;
             case YELLOW:
-                return TextFormatting.YELLOW;
+                return ChatFormatting.YELLOW;
             case WHITE:
-                return TextFormatting.WHITE;
+                return ChatFormatting.WHITE;
             case OBFUSCATED:
-                return TextFormatting.OBFUSCATED;
+                return ChatFormatting.OBFUSCATED;
             case BOLD:
-                return TextFormatting.BOLD;
+                return ChatFormatting.BOLD;
             case STRIKETHROUGH:
-                return TextFormatting.STRIKETHROUGH;
+                return ChatFormatting.STRIKETHROUGH;
             case UNDERLINE:
-                return TextFormatting.UNDERLINE;
+                return ChatFormatting.UNDERLINE;
             case ITALIC:
-                return TextFormatting.ITALIC;
+                return ChatFormatting.ITALIC;
             case RESET:
-                return TextFormatting.RESET;
+                return ChatFormatting.RESET;
         }
         throw new RuntimeException("Enum constant has magically disappeared?");
     }
@@ -81,24 +81,25 @@ public class SenderWrapper implements ISender
     @Override
     public String getName()
     {
-        return sender.getName();
+        return sender.getTextName();
     }
 
     @Override
     public void sendMessage(String message)
     {
-        sender.sendMessage(new TextComponentString(message));
+        // TODO not all the sendMessage calls are for successes
+        sender.sendSuccess(Component.literal(message), true);
     }
 
     @Override
     public void sendMessage(String message, FormatCode formatCode)
     {
-        sender.sendMessage(new TextComponentString(message).setStyle(new Style().setColor(getFormatCode(formatCode))));
+        sender.sendSuccess(Component.literal(message).withStyle(getFormatCode(formatCode)), true);
     }
 
     @Override
     public String toString()
     {
-        return "SenderWrapper{" + sender.getName() + "}";
+        return "SenderWrapper{" + getName() + "}";
     }
 }
