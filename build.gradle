@@ -4,7 +4,6 @@ import groovy.json.JsonSlurper
 
 plugins {
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '5.1.+' apply false
 }
 
 
@@ -92,15 +91,15 @@ subprojects {
     if (project.hasProperty('minecraft')) {
         // TODO actually get this from the project. old code used project.minecraft.version but that doesn't seem to work anymore
         def project_mc_version = "1.19"
-//        sourceJar {
-//            //noinspection GroovyAssignabilityCheck
-//            duplicatesStrategy = 'exclude'
-//            from rootProject.sourceSets.main.allSource
-//        }
-//        task sourcesJar(type: Jar) {
-//            duplicatesStrategy = DuplicatesStrategy.INCLUDE
-//            from rootProject.sourceSets.main.allSource
-//        }
+
+        java {
+            withSourcesJar()
+        }
+
+        sourcesJar {
+            duplicatesStrategy = 'exclude'
+            from rootProject.sourceSets.main.allSource
+        }
 
         //noinspection GroovyAssignabilityCheck
         project.tasks.withType(Jar) { jarTask ->
@@ -112,14 +111,9 @@ subprojects {
             inputs.property "version", project.version
             inputs.property "mcversion", project_mc_version
 
-//            from(sourceSets.main.resources.srcDirs) {
-//                include 'mods.toml'
-//                expand 'version': project.version, 'mcversion': project.minecraft.mappingVersion
-//            }
-
-//            from(sourceSets.main.resources.srcDirs) {
-//                exclude 'mods.toml'
-//            }
+            filesMatching('META-INF/mods.toml') {
+                expand 'version': project.version, 'mcversion': project_mc_version
+            }
 
             doLast {
                 //noinspection GroovyAssignabilityCheck

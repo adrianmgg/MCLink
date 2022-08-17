@@ -10,19 +10,73 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.ChatSender;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Dries007
  */
 @SuppressWarnings("Duplicates")
-public class SenderWrapper implements ISender
+public abstract class SenderWrapper implements ISender
 {
-    private final CommandSourceStack sender;
-
-    SenderWrapper(CommandSourceStack sender)
+    public static class OfCommandSourceStack extends SenderWrapper
     {
-        this.sender = sender;
+        private final CommandSourceStack sender;
+
+        OfCommandSourceStack(CommandSourceStack sender)
+        {
+            this.sender = sender;
+        }
+
+        @NotNull
+        @Override
+        public String getName()
+        {
+            return sender.getTextName();
+        }
+
+        @Override
+        public void sendMessage(String message)
+        {
+            // TODO not all the sendMessage calls are for successes
+            sender.sendSuccess(Component.literal(message), true);
+        }
+
+        @Override
+        public void sendMessage(String message, FormatCode formatCode)
+        {
+            sender.sendSuccess(Component.literal(message).withStyle(getFormatCode(formatCode)), true);
+        }
+    }
+
+    public static class OfPlayer extends SenderWrapper
+    {
+        private final Player sender;
+
+        OfPlayer(Player sender)
+        {
+            this.sender = sender;
+        }
+
+        @NotNull
+        @Override
+        public String getName()
+        {
+            return sender.getGameProfile().getName();
+        }
+
+        @Override
+        public void sendMessage(String message)
+        {
+            // TODO not all the sendMessage calls are for successes
+            sender.sendSystemMessage(Component.literal(message));
+        }
+
+        @Override
+        public void sendMessage(String message, FormatCode formatCode)
+        {
+            sender.sendSystemMessage(Component.literal(message).withStyle(getFormatCode(formatCode)));
+        }
     }
 
     private static ChatFormatting getFormatCode(FormatCode formatCode)
@@ -75,26 +129,6 @@ public class SenderWrapper implements ISender
                 return ChatFormatting.RESET;
         }
         throw new RuntimeException("Enum constant has magically disappeared?");
-    }
-
-    @NotNull
-    @Override
-    public String getName()
-    {
-        return sender.getTextName();
-    }
-
-    @Override
-    public void sendMessage(String message)
-    {
-        // TODO not all the sendMessage calls are for successes
-        sender.sendSuccess(Component.literal(message), true);
-    }
-
-    @Override
-    public void sendMessage(String message, FormatCode formatCode)
-    {
-        sender.sendSuccess(Component.literal(message).withStyle(getFormatCode(formatCode)), true);
     }
 
     @Override

@@ -6,136 +6,216 @@ package net.dries007.mclink;
 
 import com.google.common.collect.ImmutableCollection;
 import com.mojang.authlib.GameProfile;
-import net.dries007.mclink.api.APIException;
+import com.mojang.logging.LogUtils;
 import net.dries007.mclink.api.Authentication;
 import net.dries007.mclink.api.Constants;
 import net.dries007.mclink.binding.FormatCode;
-import net.dries007.mclink.binding.IConfig;
 import net.dries007.mclink.binding.IPlayer;
-import net.dries007.mclink.common.Log4jLogger;
 import net.dries007.mclink.common.MCLinkCommon;
-import net.dries007.mclink.common.Player;
 import net.dries007.mclink.common.ThreadStartConsumer;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.network.NetHandlerPlayServer;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.Connection;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.login.ClientboundLoginDisconnectPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.management.PlayerList;
-import net.minecraft.util.text.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.FMLCommonHandler;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.PlayerNegotiationEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
-import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
-import net.minecraftforge.fml.common.network.FMLNetworkEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraftforge.forgespi.language.IModInfo;
 import org.jetbrains.annotations.Nullable;
-
-import java.io.IOException;
+import org.slf4j.Logger;
 import java.util.UUID;
 
 /**
  * @author Dries007
  */
 @SuppressWarnings("Duplicates")
-@Mod(modid = Constants.MODID, name = Constants.MODNAME, useMetadata = true, acceptableRemoteVersions = "*", dependencies = "before:*")
+@Mod(Constants.MODID)
 public class MCLink extends MCLinkCommon
 {
     private MinecraftServer server;
 
-    @Mod.EventHandler
-    public void preInit(final FMLPreInitializationEvent event) throws IConfig.ConfigException, IOException, APIException
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    public MCLink()
     {
-        super.setModVersion(event.getModMetadata().version);
-        super.setMcVersion(MinecraftForge.MC_VERSION);
-        super.setBranding(FMLCommonHandler.instance().getModName());
-        super.setLogger(new Log4jLogger(event.getModLog()));
-        super.setConfig(new ForgeConfig(event.getSuggestedConfigurationFile()));
-        super.setSide(event.getSide().isClient() ? Side.CLIENT : Side.SERVER);
-        super.init();
-        if (event.getSide().isServer()) MinecraftForge.EVENT_BUS.register(this);
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::serverSetup);
+        modEventBus.addListener(this::clientSetup);
+        MinecraftForge.EVENT_BUS.register(this);
     }
 
-    @Mod.EventHandler
-    public void serverStarting(FMLServerStartingEvent event)
+    @SubscribeEvent
+    public void registerCommandsEvent(RegisterCommandsEvent event) {
+        // TODO for now this is just reimplementing the commands, would be better to refactor ICommand/MCLinkCommand a bit to work with this style of command registration
+        event.getDispatcher().register(Commands.literal(Constants.MODID)
+            .executes(context -> {
+                SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
+                sender.sendMessage("Subcommands:", FormatCode.AQUA);
+                sender.sendMessage("- close: Do not let anyone join via MCLink. Ops and manually whitelisted players can still join.");
+                sender.sendMessage("- open: Let people join via MCLink again.");
+                sender.sendMessage("- reload: Reload all configs & API status. May take a few moments.");
+                sender.sendMessage("- status: Get current open/closed status & any API messages.");
+                return 0;
+            })
+            .then(Commands.literal("close")
+                .executes(context -> {
+                    if(!this.close()) {
+                        context.getSource().sendFailure(Component.literal("Server already closed.").withStyle(ChatFormatting.YELLOW));
+                    }
+                    return 0;
+                }))
+            .then(Commands.literal("open")
+                .executes(context -> {
+                    if(!this.open()) {
+                        context.getSource().sendFailure(Component.literal("Server already open.").withStyle(ChatFormatting.YELLOW));
+                    }
+                    return 0;
+                }))
+            .then(Commands.literal("reload")
+                // TODO - config reloads are automatic, probably put a message about that somewhere
+                .executes(context -> {
+                    SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
+                    this.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));;
+                    this.reloadConfigAsync(sender);
+                    return 0;
+                }))
+            .then(Commands.literal("status")
+                .executes(context -> {
+                    SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
+                    this.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));
+                    context.getSource().sendSuccess(Component.literal("The server is currently " + (this.getConfig().isClosed() ? "CLOSED" : "OPENED")), true);
+                    return 0;
+                }))
+        );
+    }
+
+    public void commonSetup(FMLCommonSetupEvent event)
+    {
+        IModInfo ourInfo = ModList.get().getModContainerByObject(this).orElseThrow().getModInfo();
+        super.setModVersion(ourInfo.getVersion().toString());
+        super.setMcVersion("1.19"); // TODO implement properly
+        super.setBranding(ourInfo.getDisplayName());
+        super.setLogger(new Slf4jLogger(LOGGER));
+        super.setConfig(new ForgeConfig(FMLPaths.CONFIGDIR.get().resolve("mclink.toml").toFile()));
+    }
+
+    public void serverSetup(FMLDedicatedServerSetupEvent event)
+    {
+        super.setSide(Side.SERVER);
+        try {
+            super.init();
+        } catch (Throwable t) {
+            LOGGER.error("error initializing mclink", t);
+        }
+        // TODO see event bus register call in old implementation - why just on server? which events specifically? need to make sure that's ported properly
+    }
+
+    public void clientSetup(FMLClientSetupEvent event)
+    {
+        super.setSide(Side.CLIENT);
+        try {
+            super.init();
+        } catch (Throwable t) {
+            LOGGER.error("error initializing mclink", t);
+        }
+    }
+
+    @SubscribeEvent
+    public void serverStarting(ServerStartingEvent event)
     {
         server = event.getServer();
-        super.registerCommands(e -> event.registerServerCommand(new CommandWrapper(this, e)));
     }
 
-    @Mod.EventHandler
-    public void serverStopped(FMLServerStoppedEvent event)
+    @SubscribeEvent
+    public void serverStopped(ServerStoppedEvent event)
     {
         server = null;
         super.deInit();
     }
 
-    private Player getPlayerFromEntity(EntityPlayer player)
+    private net.dries007.mclink.common.Player getPlayerFromEntity(net.minecraft.world.entity.player.Player player)
     {
-        return new Player(new SenderWrapper(player), player.getDisplayNameString(), player.getPersistentID());
+        return new net.dries007.mclink.common.Player(new SenderWrapper.OfPlayer(player), player.getGameProfile().getName(), player.getGameProfile().getId());
     }
 
     @SubscribeEvent
-    public void connectEvent(FMLNetworkEvent.ServerConnectionFromClientEvent event)
+    public void onPlayerNegotiation(PlayerNegotiationEvent event)
     {
-        if (event.isLocal()) return;
-        EntityPlayerMP p = ((NetHandlerPlayServer) event.getHandler()).player;
-        GameProfile gp = p.getGameProfile();
+        GameProfile gp = event.getProfile();
         PlayerList pl = server.getPlayerList();
-        boolean op = pl.getOppedPlayers().bypassesPlayerLimit(gp) || pl.getOppedPlayers().getPermissionLevel(gp) > 0;
-        boolean wl = pl.getWhitelistedPlayers().isWhitelisted(gp);
-        super.checkAuthStatusAsync(getPlayerFromEntity(p), op, wl, new ThreadStartConsumer("checker-" + gp.getId()));
+        boolean op = pl.canBypassPlayerLimit(gp) || server.getProfilePermissions(gp) > 0;
+        boolean wl = pl.isWhiteListed(gp);
+        super.checkAuthStatusAsync(new ConnectingPlayerWrapper(gp.getId(), gp.getName(), event.getConnection()), op, wl, event::enqueueWork);
     }
 
     @SubscribeEvent
-    public void loginEvent(PlayerLoggedInEvent event)
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event)
     {
-        super.login(getPlayerFromEntity(event.player), event.player.canUseCommand(3, Constants.MODID));
+        // TODO is 1 the right level to check for?
+        super.login(getPlayerFromEntity(event.getEntity()), event.getEntity().hasPermissions(1));
     }
 
     @Override
     protected void authCompleteAsync(IPlayer player, ImmutableCollection<Authentication> authentications, Marker result)
     {
-        server.addScheduledTask(() -> {
-            // Don't kick players unless result was one of the DENIED_* values
-            if (result != Marker.ALLOWED)
-            {
-                EntityPlayerMP p = server.getPlayerList().getPlayerByUUID(player.getUuid());
-                //noinspection ConstantConditions
-                if (p != null) // The player may have disconnected before this could happen.
-                    p.connection.disconnect(new TextComponentString(getConfig().getMessage(result)));
+        // Don't kick players unless result was one of the DENIED_* values
+        if(result != Marker.ALLOWED)
+        {
+            // if the player is still connecting we can't just get them via the player list (since they haven't
+            // finished connecting yet), so we need to special case how we disconnect them to use the Connection we got
+            // from the PlayerNegotiationEvent instead.
+            if(player instanceof ConnectingPlayerWrapper) {
+                Connection connection = ((ConnectingPlayerWrapper)player).connection;
+                Component msg = Component.literal(getConfig().getMessage(result));
+                connection.send(new ClientboundLoginDisconnectPacket(msg));
+                connection.disconnect(msg);
+            } else {
+                ServerPlayer p = server.getPlayerList().getPlayer(player.getUuid());
+                if(p != null) // The player may have disconnected before this could happen.
+                    p.connection.disconnect(Component.literal(getConfig().getMessage(result)));
             }
-            // Fire the event in all cases
-            MinecraftForge.EVENT_BUS.post(new MCLinkAuthEvent(player.getUuid(), authentications, result));
-        });
+        }
+        // Fire the event in all cases
+        MinecraftForge.EVENT_BUS.post(new MCLinkAuthEvent(player.getUuid(), authentications, result));
     }
 
     @Nullable
     @Override
     protected String nameFromUUID(UUID uuid)
     {
-        GameProfile gp = server.getPlayerProfileCache().getProfileByUUID(uuid);
-        //noinspection ConstantConditions
-        if (gp == null) return null;
-        return gp.getName();
+        return server.getProfileCache().get(uuid).map(GameProfile::getName).orElse(null);
     }
 
     @Override
     public void sendMessage(String message)
     {
-        ITextComponent m = new TextComponentTranslation("chat.type.admin", Constants.MODNAME, message);
-        m.setStyle(new Style().setColor(TextFormatting.GRAY).setItalic(true));
-        if (server.shouldBroadcastConsoleToOps())
+        Component m = Component.translatable("chat.type.admin", Constants.MODNAME, message)
+            .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC);
+        // TODO was `if (server.shouldBroadcastConsoleToOps())`
+        if (true)
         {
-            //noinspection unchecked
-            for (EntityPlayer p : server.getPlayerList().getPlayers())
+            for (ServerPlayer p : server.getPlayerList().getPlayers())
             {
-                if (server.getPlayerList().canSendCommands(p.getGameProfile())) p.sendMessage(m);
+                if(p.hasPermissions(2)) p.sendSystemMessage(m);
             }
         }
-        server.sendMessage(m);
     }
 
     @Override
