@@ -19,6 +19,20 @@ import org.jetbrains.annotations.NotNull;
 @SuppressWarnings("Duplicates")
 public abstract class SenderWrapper implements ISender
 {
+    protected abstract void sendMessage(Component message);
+
+    @Override
+    public void sendMessage(String message)
+    {
+        sendMessage(Component.literal(message));
+    }
+
+    @Override
+    public void sendMessage(String message, FormatCode formatCode)
+    {
+        sendMessage(Component.literal(message).withStyle(getFormatCode(formatCode)));
+    }
+
     public static class OfCommandSourceStack extends SenderWrapper
     {
         private final CommandSourceStack sender;
@@ -36,16 +50,10 @@ public abstract class SenderWrapper implements ISender
         }
 
         @Override
-        public void sendMessage(String message)
+        protected void sendMessage(Component message)
         {
             // TODO not all the sendMessage calls are for successes
-            sender.sendSuccess(Component.literal(message), true);
-        }
-
-        @Override
-        public void sendMessage(String message, FormatCode formatCode)
-        {
-            sender.sendSuccess(Component.literal(message).withStyle(getFormatCode(formatCode)), true);
+            sender.sendSuccess(message, true);
         }
     }
 
@@ -66,16 +74,9 @@ public abstract class SenderWrapper implements ISender
         }
 
         @Override
-        public void sendMessage(String message)
+        protected void sendMessage(Component message)
         {
-            // TODO not all the sendMessage calls are for successes
-            sender.sendSystemMessage(Component.literal(message));
-        }
-
-        @Override
-        public void sendMessage(String message, FormatCode formatCode)
-        {
-            sender.sendSystemMessage(Component.literal(message).withStyle(getFormatCode(formatCode)));
+            sender.sendSystemMessage(message);
         }
     }
 

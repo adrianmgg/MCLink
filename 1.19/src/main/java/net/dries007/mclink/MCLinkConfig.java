@@ -5,7 +5,6 @@
 package net.dries007.mclink;
 
 import com.electronwill.nightconfig.core.CommentedConfig;
-import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.mojang.logging.LogUtils;
@@ -22,23 +21,21 @@ import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
-// TODO probably rename this to avoid confusion with `ForgeConfigSpec`
-// TODO integrate this more into the new forge config system?
 /**
  * @author Dries007
  */
 @SuppressWarnings("Duplicates")
-public class ForgeConfig extends CommonConfig
+public class MCLinkConfig extends CommonConfig
 {
     private static final String CATEGORY_SERVICES = "Services";
-//    private final FileConfig cfg;
+
     private final CommentedFileConfig cfg;
 
     private static final String CATEGORY_GENERAL = "general";
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    ForgeConfig(File file)
+    MCLinkConfig(File file)
     {
         this.cfg = CommentedFileConfig.of(file);
     }
@@ -63,23 +60,29 @@ public class ForgeConfig extends CommonConfig
 
     private CommentedConfig _getOrCreateCategory(String categoryName)
     {
-        // TODO handle case where category present but wrong type
-        CommentedConfig category = cfg.<CommentedConfig>get(List.of(categoryName));
-        if(category != null) return category;
-        else {
+        try {
+            CommentedConfig category = cfg.get(List.of(categoryName));
+            if (category != null) return category;
+            else {
+                CommentedConfig newCategory = CommentedConfig.inMemory();
+                cfg.set(List.of(categoryName), newCategory);
+                return newCategory;
+            }
+        } catch(ClassCastException e) {
+            LOGGER.warn("config category {} didn't match expected type (CommentedConfig), replacing with default value.", categoryName);
+            LOGGER.warn("", e);
             CommentedConfig newCategory = CommentedConfig.inMemory();
             cfg.set(List.of(categoryName), newCategory);
             return newCategory;
         }
     }
 
-    private <T> void _setDefaultComment(String comment, String category, String key)
+    private void _setDefaultComment(String comment, String category, String key)
     {
         List<String> path = List.of(category, key);
         @Nullable String curComment = cfg.getComment(path);
         if(curComment == null) {
             cfg.setComment(path, comment);
-            // TODO check that setting the comment set actually stuck
         }
     }
 
@@ -87,18 +90,23 @@ public class ForgeConfig extends CommonConfig
     {
         _getOrCreateCategory(category);
         List<String> pathList = List.of(category, key);
-        // TODO handle case where key present on category but wrong value type
-        T curVal = cfg.<T>get(pathList);
-        if(curVal != null) return curVal;
-        else {
+        try {
+            T curVal = cfg.get(pathList);
+            if (curVal != null) return curVal;
+            else {
+                cfg.<T>set(pathList, defaultVal);
+                return defaultVal;
+            }
+        } catch(ClassCastException e) {
+            LOGGER.warn("config property {}.{} didn't match expected type, replacing with default value.", category, key);
+            LOGGER.warn("", e);
             cfg.<T>set(pathList, defaultVal);
             return defaultVal;
         }
     }
 
-    // TODO rename this
     @NotNull
-    private <T> T _get(@NotNull T defaultVal, @NotNull String comment, @NotNull String category, @NotNull String key)
+    private <T> T _getOrSetDefaultWithComment(@NotNull T defaultVal, @NotNull String comment, @NotNull String category, @NotNull String key)
     {
         T ret = _getOrDefaultAndPopulate(defaultVal, category, key);
         _setDefaultComment(comment, category, key);
@@ -108,26 +116,33 @@ public class ForgeConfig extends CommonConfig
     @Override
     protected String getString(String key, String def, String comment)
     {
-        return _get(def, comment, CATEGORY_GENERAL, key);
+        return _getOrSetDefaultWithComment(def, comment, CATEGORY_GENERAL, key);
     }
 
     @Override
     protected boolean getBoolean(String key, boolean def, String comment)
     {
-        return _get(def, comment, CATEGORY_GENERAL, key);
+        return _getOrSetDefaultWithComment(def, comment, CATEGORY_GENERAL, key);
     }
 
     @Override
     protected int getInt(String key, int def, int min, int max, String comment)
     {
-        // TODO range not used
-        return _get(def, comment, CATEGORY_GENERAL, key);
+        int val = _getOrSetDefaultWithComment(def, comment, CATEGORY_GENERAL, key);
+        int clamped = Math.max(min, Math.min(max, val));
+        if(val == clamped) return val;
+        else
+        {
+            LOGGER.warn("config property {}.{} was {}, which is outside its allowed range [{}, {}]. replacing with clamped value {}.", CATEGORY_GENERAL, key, val, min, max, clamped);
+            cfg.set(List.of(CATEGORY_GENERAL, key), clamped);
+            return clamped;
+        }
     }
 
     @Override
     protected void addService(String name, String comment)
     {
-        _get(List.<List<String>>of(), comment, CATEGORY_SERVICES, name);
+        _getOrSetDefaultWithComment(List.<List<String>>of(), comment, CATEGORY_SERVICES, name);
     }
 
     @Override

@@ -14,6 +14,7 @@ import net.dries007.mclink.binding.IPlayer;
 import net.dries007.mclink.common.MCLinkCommon;
 import net.dries007.mclink.common.ThreadStartConsumer;
 import net.minecraft.ChatFormatting;
+import net.minecraft.SharedConstants;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
@@ -44,7 +45,6 @@ import java.util.UUID;
 /**
  * @author Dries007
  */
-@SuppressWarnings("Duplicates")
 @Mod(Constants.MODID)
 public class MCLink extends MCLinkCommon
 {
@@ -89,7 +89,6 @@ public class MCLink extends MCLinkCommon
                     return 0;
                 }))
             .then(Commands.literal("reload")
-                // TODO - config reloads are automatic, probably put a message about that somewhere
                 .executes(context -> {
                     SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
                     this.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));;
@@ -110,10 +109,10 @@ public class MCLink extends MCLinkCommon
     {
         IModInfo ourInfo = ModList.get().getModContainerByObject(this).orElseThrow().getModInfo();
         super.setModVersion(ourInfo.getVersion().toString());
-        super.setMcVersion("1.19"); // TODO implement properly
+        super.setMcVersion(SharedConstants.VERSION_STRING);
         super.setBranding(ourInfo.getDisplayName());
         super.setLogger(new Slf4jLogger(LOGGER));
-        super.setConfig(new ForgeConfig(FMLPaths.CONFIGDIR.get().resolve("mclink.toml").toFile()));
+        super.setConfig(new MCLinkConfig(FMLPaths.CONFIGDIR.get().resolve("mclink.toml").toFile()));
     }
 
     public void serverSetup(FMLDedicatedServerSetupEvent event)
@@ -124,7 +123,6 @@ public class MCLink extends MCLinkCommon
         } catch (Throwable t) {
             LOGGER.error("error initializing mclink", t);
         }
-        // TODO see event bus register call in old implementation - why just on server? which events specifically? need to make sure that's ported properly
     }
 
     public void clientSetup(FMLClientSetupEvent event)
@@ -168,8 +166,7 @@ public class MCLink extends MCLinkCommon
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event)
     {
-        // TODO is 1 the right level to check for?
-        super.login(getPlayerFromEntity(event.getEntity()), event.getEntity().hasPermissions(1));
+        super.login(getPlayerFromEntity(event.getEntity()), server.getPlayerList().isOp(event.getEntity().getGameProfile()));
     }
 
     @Override
@@ -208,12 +205,13 @@ public class MCLink extends MCLinkCommon
     {
         Component m = Component.translatable("chat.type.admin", Constants.MODNAME, message)
             .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC);
-        // TODO was `if (server.shouldBroadcastConsoleToOps())`
-        if (true)
+        if (server.shouldInformAdmins())
         {
             for (ServerPlayer p : server.getPlayerList().getPlayers())
             {
-                if(p.hasPermissions(2)) p.sendSystemMessage(m);
+                if(server.getPlayerList().isOp(p.getGameProfile())) {
+                    p.sendSystemMessage(m);
+                }
             }
         }
     }

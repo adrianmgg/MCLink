@@ -30,7 +30,7 @@ displayName="MCLink" #mandatory
 # A file name (in the root of the mod JAR) containing a logo for display
 logoFile="MCLink_128.png" #optional
 # A text field displayed in the mod UI
-credits="Thanks for this example mod goes to Java" #optional
+#credits="Thanks for this example mod goes to Java" #optional
 # A text field displayed in the mod UI
 authors="Dries007" #optional
 # Display Test controls the display for your mod in the server connection screen
@@ -58,7 +58,7 @@ Automatic subscriber whitelist management
     # Side this dependency is applied on - BOTH, CLIENT or SERVER
     side="BOTH"
 # Here's another dependency
-[[dependencies.examplemod]]
+[[dependencies.mclink]]
     modId="minecraft"
     mandatory=true
 # This version range declares a minimum of the current minecraft version up to but not including the next major version
