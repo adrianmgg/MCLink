@@ -146,7 +146,7 @@ public class MCLink extends MCLinkCommon
         GameProfile gp = event.getProfile();
         PlayerList pl = server.getPlayerList();
         boolean op = pl.canBypassPlayerLimit(gp) || server.getProfilePermissions(gp) > 0;
-        boolean wl = pl.isWhiteListed(gp);
+        boolean wl = pl.getWhiteList().isWhiteListed(gp);
         super.checkAuthStatusAsync(new ConnectingPlayerWrapper(gp.getId(), gp.getName(), event.getConnection()), op, wl, event::enqueueWork);
     }
 
