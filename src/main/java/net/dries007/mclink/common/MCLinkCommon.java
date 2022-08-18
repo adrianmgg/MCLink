@@ -88,7 +88,30 @@ public abstract class MCLinkCommon implements IMinecraft
 
     public void registerCommands(Consumer<ICommand> register)
     {
-        register.accept(new MCLinkCommand());
+        register.accept(new SubcommandsCommand(Constants.MODID, "",
+            new FunctionCommand("close",
+                "Do not let anyone join via MCLink. Ops and manually whitelisted players can still join.",
+                (mc, sender, args) -> {
+                    if (!mc.close()) sender.sendMessage("Server already closed.", FormatCode.YELLOW);
+                }),
+            new FunctionCommand("open",
+                "Let people join via MCLink again.",
+                (mc, sender, args) -> {
+                    if (!mc.open()) sender.sendMessage("Server already open.", FormatCode.YELLOW);
+                }),
+            new FunctionCommand("reload",
+                "Reload all configs & API status. May take a few moments.",
+                (mc, sender, args) -> {
+                    mc.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));
+                    mc.reloadConfigAsync(sender);
+                }),
+            new FunctionCommand("status",
+                "Get current open/closed status & any API messages.",
+                (mc, sender, args) -> {
+                    mc.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));
+                    sender.sendMessage("The server is currently " + (mc.getConfig().isClosed() ? "CLOSED" : "OPENED"));
+                })
+        ));
     }
 
     public void login(IPlayer player, boolean sendStatus)

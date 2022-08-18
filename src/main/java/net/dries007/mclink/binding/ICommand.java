@@ -23,6 +23,10 @@ public interface ICommand
 
     @NotNull List<String> getTabOptions(@NotNull ISender sender, @NotNull String[] args);
 
+    @NotNull List<ICommand> getSubCommands();
+
+    @NotNull String getHelpText();
+
     class CommandException extends Exception
     {
         public CommandException(String message)

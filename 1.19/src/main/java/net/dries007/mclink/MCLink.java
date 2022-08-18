@@ -6,15 +6,18 @@ package net.dries007.mclink;
 
 import com.google.common.collect.ImmutableCollection;
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.logging.LogUtils;
 import net.dries007.mclink.api.Authentication;
 import net.dries007.mclink.api.Constants;
 import net.dries007.mclink.binding.FormatCode;
+import net.dries007.mclink.binding.ICommand;
 import net.dries007.mclink.binding.IPlayer;
 import net.dries007.mclink.common.MCLinkCommon;
 import net.dries007.mclink.common.ThreadStartConsumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
@@ -63,46 +66,30 @@ public class MCLink extends MCLinkCommon
 
     @SubscribeEvent
     public void registerCommandsEvent(RegisterCommandsEvent event) {
-        // TODO for now this is just reimplementing the commands, would be better to refactor ICommand/MCLinkCommand a bit to work with this style of command registration
-        event.getDispatcher().register(Commands.literal(Constants.MODID)
-            .executes(context -> {
-                SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
-                sender.sendMessage("Subcommands:", FormatCode.AQUA);
-                sender.sendMessage("- close: Do not let anyone join via MCLink. Ops and manually whitelisted players can still join.");
-                sender.sendMessage("- open: Let people join via MCLink again.");
-                sender.sendMessage("- reload: Reload all configs & API status. May take a few moments.");
-                sender.sendMessage("- status: Get current open/closed status & any API messages.");
-                return 0;
-            })
-            .then(Commands.literal("close")
-                .executes(context -> {
-                    if(!this.close()) {
-                        context.getSource().sendFailure(Component.literal("Server already closed.").withStyle(ChatFormatting.YELLOW));
-                    }
-                    return 0;
-                }))
-            .then(Commands.literal("open")
-                .executes(context -> {
-                    if(!this.open()) {
-                        context.getSource().sendFailure(Component.literal("Server already open.").withStyle(ChatFormatting.YELLOW));
-                    }
-                    return 0;
-                }))
-            .then(Commands.literal("reload")
-                .executes(context -> {
-                    SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
-                    this.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));;
-                    this.reloadConfigAsync(sender);
-                    return 0;
-                }))
-            .then(Commands.literal("status")
-                .executes(context -> {
-                    SenderWrapper sender = new SenderWrapper.OfCommandSourceStack(context.getSource());
-                    this.reloadAPIStatusAsync(sender, new ThreadStartConsumer("reloadAPIStatusAsync"));
-                    context.getSource().sendSuccess(Component.literal("The server is currently " + (this.getConfig().isClosed() ? "CLOSED" : "OPENED")), true);
-                    return 0;
-                }))
-        );
+        super.registerCommands(command -> {
+            event.getDispatcher().register(buildCommand(command));
+        });
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> buildCommand(ICommand command) {
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(command.getName());
+        builder = builder.executes(context -> {
+            try
+            {
+                command.run(this, new SenderWrapper.OfCommandSourceStack(context.getSource()), new String[0]);
+            }
+            catch (ICommand.CommandException e)
+            {
+                context.getSource().sendFailure(Component.literal(e.getMessage()));
+                LOGGER.error("encountered error running mclink command", e);
+            }
+            return 0;
+        });
+        for(ICommand subcommand : command.getSubCommands())
+        {
+            builder = builder.then(buildCommand(subcommand));
+        }
+        return builder;
     }
 
     public void commonSetup(FMLCommonSetupEvent event)
