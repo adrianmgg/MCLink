@@ -4,6 +4,9 @@ import groovy.json.JsonSlurper
 
 plugins {
     id 'maven-publish'
+    id 'java'
+    id 'eclipse'
+    id 'idea'
 }
 
 
@@ -26,10 +29,6 @@ ext.getChangeLog = { ->
 
 evaluationDependsOnChildren()
 
-
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
 
 java {
     withSourcesJar()
@@ -89,9 +88,6 @@ subprojects {
     }
 
     if (project.hasProperty('minecraft')) {
-        // TODO actually get this from the project. old code used project.minecraft.version but that doesn't seem to work anymore
-        def project_mc_version = "1.19"
-
         java {
             withSourcesJar()
         }
@@ -104,15 +100,16 @@ subprojects {
         //noinspection GroovyAssignabilityCheck
         project.tasks.withType(Jar) { jarTask ->
             jarTask.duplicatesStrategy = 'exclude'
-            jarTask.appendix = 'Forge-' + project_mc_version
+            jarTask.appendix = 'Forge-' + project.MC_VERSION
         }
+
 
         processResources {
             inputs.property "version", project.version
-            inputs.property "mcversion", project_mc_version
+            inputs.property "mcversion", project.MC_VERSION
 
             filesMatching('META-INF/mods.toml') {
-                expand 'version': project.version, 'mcversion': project_mc_version
+                expand 'version': project.version, 'mcversion': project.MC_VERSION
             }
 
             doLast {
@@ -126,12 +123,12 @@ subprojects {
                     json = builder(homepage: "https://mclink.dries007.net", promos: new HashMap<>())
                 }
                 //noinspection GroovyAssignabilityCheck
-                json['promos'][project_mc_version + '-latest'] = project.version
+                json['promos'][project.MC_VERSION + '-latest'] = project.version
                 //noinspection GroovyAssignabilityCheck
-                json['promos'][project_mc_version + '-recommended'] = project.version
-                if (!json.containsKey(project_mc_version)) json.put(project_mc_version, new HashMap<>())
+                json['promos'][project.MC_VERSION + '-recommended'] = project.version
+                if (!json.containsKey(project.MC_VERSION)) json.put(project.MC_VERSION, new HashMap<>())
                 //noinspection GroovyAssignabilityCheck
-                def version = json[project_mc_version]
+                def version = json[project.MC_VERSION]
                 version.put(project.version, getChangeLog())
                 updateFile.write JsonOutput.prettyPrint(JsonOutput.toJson(json))
             }

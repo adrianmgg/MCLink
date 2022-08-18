@@ -5,9 +5,6 @@ plugins {
     id 'com.matthewprenger.cursegradle' version '1.4.0'
 }
 
-// TODO
-def minecraft_version = '1.19'
-
 // Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -54,6 +51,7 @@ minecraft {
             mods {
                 mclink {
                     source sourceSets.main
+                    source rootProject.sourceSets.main
                 }
             }
         }
@@ -70,42 +68,7 @@ minecraft {
             mods {
                 mclink {
                     source sourceSets.main
-                }
-            }
-        }
-
-        // This run config launches GameTestServer and runs all registered gametests, then exits.
-        // By default, the server will crash when no gametests are provided.
-        // The gametest system is also enabled by default for other run configs under the /test command.
-        gameTestServer {
-            workingDirectory project.file('run')
-
-            property 'forge.logging.markers', 'REGISTRIES'
-
-            property 'forge.logging.console.level', 'debug'
-
-            property 'forge.enabledGameTestNamespaces', 'mclink'
-
-            mods {
-                mclink {
-                    source sourceSets.main
-                }
-            }
-        }
-
-        data {
-            workingDirectory project.file('run')
-
-            property 'forge.logging.markers', 'REGISTRIES'
-
-            property 'forge.logging.console.level', 'debug'
-
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            args '--mod', 'mclink', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
-
-            mods {
-                mclink {
-                    source sourceSets.main
+                    source rootProject.sourceSets.main
                 }
             }
         }
