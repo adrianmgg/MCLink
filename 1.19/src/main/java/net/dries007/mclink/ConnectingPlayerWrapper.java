@@ -56,4 +56,13 @@ public class ConnectingPlayerWrapper implements IPlayer
     {
         throw new NotImplementedException("IPlayer sendMessage() not implemented for ConnectingPlayer");
     }
+
+    @Override
+    public String toString()
+    {
+        return "ConnectingPlayerWrapper{" +
+            "name='" + name + '\'' +
+            ", uuid=" + uuid +
+            '}';
+    }
 }

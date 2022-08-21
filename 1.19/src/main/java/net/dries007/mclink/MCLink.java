@@ -72,19 +72,20 @@ public class MCLink extends MCLinkCommon
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> buildCommand(ICommand command) {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(command.getName());
-        builder = builder.executes(context -> {
-            try
-            {
-                command.run(this, new SenderWrapper.OfCommandSourceStack(context.getSource()), new String[0]);
-            }
-            catch (ICommand.CommandException e)
-            {
-                context.getSource().sendFailure(Component.literal(e.getMessage()));
-                LOGGER.error("encountered error running mclink command", e);
-            }
-            return 0;
-        });
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(command.getName())
+            .requires(commandSourceStack -> commandSourceStack.hasPermission(Commands.LEVEL_ADMINS))
+            .executes(context -> {
+                try
+                {
+                    command.run(this, new SenderWrapper.OfCommandSourceStack(context.getSource()), new String[0]);
+                }
+                catch (ICommand.CommandException e)
+                {
+                    context.getSource().sendFailure(Component.literal(e.getMessage()));
+                    LOGGER.error("encountered error running mclink command", e);
+                }
+                return 0;
+            });
         for(ICommand subcommand : command.getSubCommands())
         {
             builder = builder.then(buildCommand(subcommand));
