@@ -65,13 +65,15 @@ public class MCLink extends MCLinkCommon
     }
 
     @SubscribeEvent
-    public void registerCommandsEvent(RegisterCommandsEvent event) {
+    public void registerCommandsEvent(RegisterCommandsEvent event)
+    {
         super.registerCommands(command -> {
             event.getDispatcher().register(buildCommand(command));
         });
     }
 
-    private LiteralArgumentBuilder<CommandSourceStack> buildCommand(ICommand command) {
+    private LiteralArgumentBuilder<CommandSourceStack> buildCommand(ICommand command)
+    {
         LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(command.getName())
             .requires(commandSourceStack -> commandSourceStack.hasPermission(Commands.LEVEL_ADMINS))
             .executes(context -> {
@@ -106,9 +108,12 @@ public class MCLink extends MCLinkCommon
     public void serverSetup(FMLDedicatedServerSetupEvent event)
     {
         super.setSide(Side.SERVER);
-        try {
+        try
+        {
             super.init();
-        } catch (Throwable t) {
+        }
+        catch (Throwable t)
+        {
             LOGGER.error("error initializing mclink", t);
         }
     }
@@ -116,9 +121,11 @@ public class MCLink extends MCLinkCommon
     public void clientSetup(FMLClientSetupEvent event)
     {
         super.setSide(Side.CLIENT);
-        try {
+        try
+        {
             super.init();
-        } catch (Throwable t) {
+        }
+        catch (Throwable t) {
             LOGGER.error("error initializing mclink", t);
         }
     }
@@ -166,12 +173,15 @@ public class MCLink extends MCLinkCommon
             // if the player is still connecting we can't just get them via the player list (since they haven't
             // finished connecting yet), so we need to special case how we disconnect them to use the Connection we got
             // from the PlayerNegotiationEvent instead.
-            if(player instanceof ConnectingPlayerWrapper) {
+            if(player instanceof ConnectingPlayerWrapper)
+            {
                 Connection connection = ((ConnectingPlayerWrapper)player).connection;
                 Component msg = Component.literal(getConfig().getMessage(result));
                 connection.send(new ClientboundLoginDisconnectPacket(msg));
                 connection.disconnect(msg);
-            } else {
+            }
+            else
+            {
                 ServerPlayer p = server.getPlayerList().getPlayer(player.getUuid());
                 if(p != null) // The player may have disconnected before this could happen.
                     p.connection.disconnect(Component.literal(getConfig().getMessage(result)));
@@ -197,7 +207,8 @@ public class MCLink extends MCLinkCommon
         {
             for (ServerPlayer p : server.getPlayerList().getPlayers())
             {
-                if(server.getPlayerList().isOp(p.getGameProfile())) {
+                if(server.getPlayerList().isOp(p.getGameProfile()))
+                {
                     p.sendSystemMessage(m);
                 }
             }

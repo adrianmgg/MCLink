@@ -60,15 +60,18 @@ public class MCLinkConfig extends CommonConfig
 
     private CommentedConfig _getOrCreateCategory(String categoryName)
     {
-        try {
+        try
+        {
             CommentedConfig category = cfg.get(List.of(categoryName));
             if (category != null) return category;
-            else {
+            else
+            {
                 CommentedConfig newCategory = CommentedConfig.inMemory();
                 cfg.set(List.of(categoryName), newCategory);
                 return newCategory;
             }
-        } catch(ClassCastException e) {
+        }
+        catch(ClassCastException e) {
             LOGGER.warn("config category {} didn't match expected type (CommentedConfig), replacing with default value.", categoryName);
             LOGGER.warn("", e);
             CommentedConfig newCategory = CommentedConfig.inMemory();
@@ -81,7 +84,8 @@ public class MCLinkConfig extends CommonConfig
     {
         List<String> path = List.of(category, key);
         @Nullable String curComment = cfg.getComment(path);
-        if(curComment == null) {
+        if(curComment == null)
+        {
             cfg.setComment(path, comment);
         }
     }
@@ -90,14 +94,17 @@ public class MCLinkConfig extends CommonConfig
     {
         _getOrCreateCategory(category);
         List<String> pathList = List.of(category, key);
-        try {
+        try
+        {
             T curVal = cfg.get(pathList);
             if (curVal != null) return curVal;
-            else {
+            else
+            {
                 cfg.<T>set(pathList, defaultVal);
                 return defaultVal;
             }
-        } catch(ClassCastException e) {
+        }
+        catch(ClassCastException e) {
             LOGGER.warn("config property {}.{} didn't match expected type, replacing with default value.", category, key);
             LOGGER.warn("", e);
             cfg.<T>set(pathList, defaultVal);

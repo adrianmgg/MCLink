@@ -16,8 +16,6 @@ import java.util.UUID;
  */
 public class ConnectingPlayerWrapper implements IPlayer
 {
-//    public Player
-
     public final UUID uuid;
 
     public final String name;
